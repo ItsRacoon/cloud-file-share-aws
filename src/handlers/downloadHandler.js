@@ -32,7 +32,7 @@ function generateDownloadPage(shareId, share, errorMessage = null) {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #0f0f0f;
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -40,21 +40,23 @@ function generateDownloadPage(shareId, share, errorMessage = null) {
             padding: 20px;
         }
         .container {
-            background: white;
-            border-radius: 20px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 12px;
             padding: 3rem;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
             max-width: 500px;
             width: 100%;
             text-align: center;
         }
         .icon { font-size: 4rem; margin-bottom: 1rem; }
-        h1 { color: #333; font-size: 2rem; margin-bottom: 0.5rem; }
-        .subtitle { color: #666; margin-bottom: 2rem; }
+        h1 { color: #ffffff; font-size: 2rem; margin-bottom: 0.5rem; font-weight: 700; letter-spacing: -0.5px; }
+        .subtitle { color: #999; margin-bottom: 2rem; }
         .file-info {
-            background: #f8f9ff;
+            background: #0f0f0f;
             padding: 1rem;
-            border-radius: 10px;
+            border: 1px solid #333;
+            border-radius: 8px;
             margin-bottom: 2rem;
             text-align: left;
         }
@@ -62,48 +64,50 @@ function generateDownloadPage(shareId, share, errorMessage = null) {
             display: flex;
             justify-content: space-between;
             padding: 0.5rem 0;
-            border-bottom: 1px solid #e0e0ff;
+            border-bottom: 1px solid #333;
         }
         .file-info-item:last-child { border-bottom: none; }
-        .label { font-weight: 600; color: #666; }
-        .value { color: #333; }
+        .label { font-weight: 600; color: #999; }
+        .value { color: #ffffff; }
         .form-group { margin-bottom: 1.5rem; text-align: left; }
-        label { display: block; font-weight: 600; color: #555; margin-bottom: 0.5rem; }
+        label { display: block; font-weight: 600; color: #ccc; margin-bottom: 0.5rem; }
         input[type="password"] {
             width: 100%;
             padding: 0.75rem;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
+            border: 1px solid #333;
+            border-radius: 8px;
             font-size: 1rem;
             transition: all 0.3s ease;
+            background: #0f0f0f;
+            color: #ffffff;
         }
         input[type="password"]:focus {
             outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            border-color: #666;
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05);
         }
         .btn {
             width: 100%;
             padding: 1rem 2rem;
             border: none;
-            border-radius: 10px;
+            border-radius: 8px;
             font-size: 1.1rem;
-            font-weight: 600;
+            font-weight: 700;
             cursor: pointer;
             transition: all 0.3s ease;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: #ffffff;
+            color: #000;
         }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4); }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(255, 255, 255, 0.3); background: #f0f0f0; }
         .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
         .alert {
             padding: 1rem;
-            border-radius: 10px;
+            border-radius: 8px;
             margin-bottom: 1rem;
             font-weight: 500;
         }
-        .alert-error { background: #ffebee; color: #d32f2f; border: 1px solid #ef9a9a; }
-        .alert-info { background: #e3f2fd; color: #1976d2; border: 1px solid #90caf9; }
+        .alert-error { background: #1a1a1a; color: #f87171; border: 1px solid #ef4444; }
+        .alert-info { background: #1a1a1a; color: #ffffff; border: 1px solid #444; }
         .loading {
             display: inline-block;
             width: 20px;
