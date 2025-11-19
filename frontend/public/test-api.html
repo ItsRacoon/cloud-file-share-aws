@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+</head>
+<body>
+    <h1>Direct API Test</h1>
+    <button onclick="testAPI()">Test API Call</button>
+    <pre id="output"></pre>
+
+    <script>
+        async function testAPI() {
+            const output = document.getElementById('output');
+            output.textContent = 'Testing...';
+            
+            try {
+                const response = await fetch('https://syp1o7qfxj.execute-api.us-east-1.amazonaws.com/upload-url', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer demo-token',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        filename: 'test.pdf',
+                        contentType: 'application/pdf',
+                        size: 1024000
+                    })
+                });
+                
+                const data = await response.json();
+                output.textContent = 'SUCCESS!\n\n' + JSON.stringify(data, null, 2);
+            } catch (error) {
+                output.textContent = 'ERROR!\n\n' + error.toString() + '\n\n' + error.stack;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -10,8 +10,16 @@ const AUTH_DISABLED = process.env.REACT_APP_AUTH_DISABLED === 'true';
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [uploadedFileId, setUploadedFileId] = useState(null);
 
   useEffect(() => {
+    // Debug: Log environment variables
+    console.log('=== Environment Variables ===');
+    console.log('API_ENDPOINT:', API_ENDPOINT);
+    console.log('REACT_APP_API_ENDPOINT:', process.env.REACT_APP_API_ENDPOINT);
+    console.log('AUTH_DISABLED:', AUTH_DISABLED);
+    console.log('============================');
+    
     // Check for existing session
     if (AUTH_DISABLED) {
       setUser({ username: 'demo-user', token: 'demo-token' });
@@ -25,6 +33,10 @@ function App() {
 
   const handleLogout = () => {
     setUser(null);
+  };
+
+  const handleFileUploaded = (fileId) => {
+    setUploadedFileId(fileId);
   };
 
   if (loading) {
@@ -57,8 +69,16 @@ function App() {
           <Auth onLogin={handleLogin} authDisabled={AUTH_DISABLED} />
         ) : (
           <>
-            <FileUpload apiEndpoint={API_ENDPOINT} token={user.token} />
-            <FileList apiEndpoint={API_ENDPOINT} token={user.token} />
+            <FileUpload 
+              apiEndpoint={API_ENDPOINT} 
+              token={user.token} 
+              onFileUploaded={handleFileUploaded}
+            />
+            <FileList 
+              apiEndpoint={API_ENDPOINT} 
+              token={user.token}
+              uploadedFileId={uploadedFileId}
+            />
           </>
         )}
       </div>

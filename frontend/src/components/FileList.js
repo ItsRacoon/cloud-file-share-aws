@@ -1,57 +1,101 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 
-function FileList({ apiEndpoint, token }) {
+function FileList({ apiEndpoint, token, uploadedFileId }) {
   const [files] = useState([]);
   const [shareConfig, setShareConfig] = useState({});
   const [shareLinks, setShareLinks] = useState({});
   const [message, setMessage] = useState('');
+  const [currentFileId, setCurrentFileId] = useState('');
+  const [processing, setProcessing] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const [processingProgress, setProcessingProgress] = useState(0);
+
+  // Auto-populate file ID when file is uploaded
+  React.useEffect(() => {
+    if (uploadedFileId) {
+      setCurrentFileId(uploadedFileId);
+      setProcessing(true);
+      setCountdown(20); // Increased to 20 seconds
+      setProcessingProgress(0);
+      setMessage('File is being processed... Please wait.');
+    }
+  }, [uploadedFileId]);
+
+  // Countdown timer and progress bar
+  React.useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(countdown - 1);
+        setProcessingProgress(((20 - countdown) / 20) * 100);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (countdown === 0 && processing) {
+      setProcessing(false);
+      setProcessingProgress(100);
+      setMessage('✓ Processing complete! You can now create a share link. If it fails, wait a few more seconds and try again.');
+    }
+  }, [countdown, processing]);
 
   const handleCreateShare = async (fileId) => {
-    const config = shareConfig[fileId] || {};
+    const config = shareConfig['manual'] || {};
     
     try {
-      const response = await axios.post(
-        `${apiEndpoint}/shares`,
-        {
+      setMessage('Creating share link...');
+      
+      const response = await fetch(`${apiEndpoint}/shares`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
           fileId,
           expiresInSeconds: parseInt(config.expiresInSeconds || 3600),
           password: config.password || null,
           maxDownloads: config.maxDownloads ? parseInt(config.maxDownloads) : null
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
+        })
+      });
 
-      const { shareId, shareUrl } = response.data;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMsg = errorData.error || `HTTP error! status: ${response.status}`;
+        
+        // If file not ready, show helpful message
+        if (errorMsg.includes('not completed') || errorMsg.includes('not found')) {
+          throw new Error('File is still being processed. Please wait a few more seconds and try again.');
+        }
+        throw new Error(errorMsg);
+      }
+
+      const data = await response.json();
+      const { shareId, shareUrl } = data;
       const fullUrl = `${apiEndpoint}${shareUrl}`;
       
       setShareLinks({
         ...shareLinks,
-        [fileId]: fullUrl
+        [fileId]: { url: fullUrl, shareId }
       });
       
-      setMessage(`Share link created for file ${fileId}`);
+      setMessage(`✓ Share link created! Copy the URL below to share.`);
       
     } catch (error) {
       console.error('Share creation error:', error);
-      setMessage(error.response?.data?.error || 'Failed to create share link');
+      setMessage(error.message || 'Failed to create share link');
     }
   };
 
   const handleRevokeShare = async (shareId) => {
     try {
-      await axios.delete(
-        `${apiEndpoint}/shares/${shareId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+      const response = await fetch(`${apiEndpoint}/shares/${shareId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
-      );
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
       setMessage('Share link revoked');
       
@@ -66,7 +110,7 @@ function FileList({ apiEndpoint, token }) {
       
     } catch (error) {
       console.error('Revoke error:', error);
-      setMessage(error.response?.data?.error || 'Failed to revoke share');
+      setMessage(error.message || 'Failed to revoke share');
     }
   };
 
@@ -96,16 +140,41 @@ function FileList({ apiEndpoint, token }) {
       <h2>📁 My Files</h2>
       
       {message && (
-        <div className="alert alert-info">
+        <div className={`alert ${processing ? 'alert-info' : 'alert-success'}`}>
           {message}
         </div>
       )}
 
-      <div className="alert alert-info">
-        <strong>Demo Mode:</strong> After uploading a file, use the File ID from the upload 
-        success message to create share links below. In production, this would automatically 
-        list your uploaded files.
-      </div>
+      {processing && (
+        <div className="card" style={{ marginBottom: '20px', background: '#fff3cd', borderColor: '#ffc107' }}>
+          <h3 style={{ color: '#856404', marginBottom: '15px' }}>⏳ Processing File...</h3>
+          <div className="progress" style={{ marginBottom: '10px' }}>
+            <div 
+              className="progress-bar" 
+              style={{ 
+                width: `${processingProgress}%`,
+                background: '#ffc107',
+                transition: 'width 1s linear'
+              }}
+            >
+              {Math.round(processingProgress)}%
+            </div>
+          </div>
+          <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#856404', textAlign: 'center' }}>
+            {countdown > 0 ? (
+              <>⏱️ {countdown} seconds remaining...</>
+            ) : (
+              <>✓ Ready!</>
+            )}
+          </div>
+          <div style={{ fontSize: '14px', color: '#856404', textAlign: 'center', marginTop: '10px' }}>
+            File is being uploaded to S3, scanned for malware, and processed. Please wait...
+          </div>
+          <div style={{ fontSize: '12px', color: '#856404', textAlign: 'center', marginTop: '5px', fontStyle: 'italic' }}>
+            If creation fails after timer, wait a few more seconds and try again.
+          </div>
+        </div>
+      )}
 
       <div style={{ marginBottom: '20px' }}>
         <h3>Create Share Link</h3>
@@ -113,8 +182,9 @@ function FileList({ apiEndpoint, token }) {
           <label>File ID</label>
           <input
             type="text"
-            placeholder="Enter file ID from upload"
-            onChange={(e) => updateShareConfig('manual', 'fileId', e.target.value)}
+            placeholder="File ID will auto-populate after upload"
+            value={currentFileId}
+            onChange={(e) => setCurrentFileId(e.target.value)}
           />
         </div>
         <div className="form-group">
@@ -145,34 +215,50 @@ function FileList({ apiEndpoint, token }) {
         <button
           className="btn btn-primary"
           onClick={() => {
-            const fileId = shareConfig['manual']?.fileId;
-            if (fileId) {
-              handleCreateShare(fileId);
+            if (currentFileId) {
+              handleCreateShare(currentFileId);
             } else {
-              setMessage('Please enter a file ID');
+              setMessage('Please enter a file ID or upload a file first');
             }
           }}
+          disabled={!currentFileId || processing}
+          style={{ opacity: processing ? 0.5 : 1 }}
         >
-          Create Share Link
+          {processing ? `⏳ Wait ${countdown}s...` : 'Create Share Link'}
         </button>
       </div>
 
       {Object.keys(shareLinks).length > 0 && (
         <div>
           <h3>Active Share Links</h3>
-          {Object.entries(shareLinks).map(([fileId, url]) => {
-            const shareId = url.split('/').pop();
+          {Object.entries(shareLinks).map(([fileId, linkData]) => {
+            const url = linkData.url || linkData;
+            const shareId = linkData.shareId || url.split('/').pop();
             return (
               <div key={fileId} className="file-item">
                 <div className="file-info">
                   <div className="file-name">File ID: {fileId}</div>
-                  <div className="share-link">{url}</div>
+                  <div className="share-link">
+                    <a href={url} target="_blank" rel="noopener noreferrer" style={{color: '#007bff', textDecoration: 'underline'}}>
+                      {url}
+                    </a>
+                  </div>
                   <div className="file-meta">
-                    Click the link or use: GET {url}
-                    {shareConfig[fileId]?.password && ' (password required)'}
+                    Click the link above to download
+                    {shareConfig['manual']?.password && ' (password required)'}
                   </div>
                 </div>
                 <div className="file-actions">
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      navigator.clipboard.writeText(url);
+                      setMessage('✓ Link copied to clipboard!');
+                    }}
+                    style={{marginRight: '10px'}}
+                  >
+                    Copy Link
+                  </button>
                   <button
                     className="btn btn-danger"
                     onClick={() => handleRevokeShare(shareId)}
