@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>☁️ Download File - Cloud File Share</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 3rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 0.5rem;
+        }
+
+        input[type="password"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: inherit;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+
+        .alert-error {
+            background: #ffebee;
+            color: #d32f2f;
+            border: 1px solid #ef9a9a;
+        }
+
+        .alert-info {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #90caf9;
+        }
+
+        .alert-success {
+            background: #e8f5e9;
+            color: #388e3c;
+            border: 1px solid #81c784;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .footer {
+            margin-top: 2rem;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .no-password-btn {
+            margin-top: 1rem;
+            background: #f0f2ff;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .no-password-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">🔒</div>
+        <h1>Password Protected</h1>
+        <p class="subtitle">This file requires a password to download</p>
+
+        <div id="message"></div>
+
+        <form id="downloadForm">
+            <div class="form-group">
+                <label for="password">Enter Password</label>
+                <input 
+                    type="password" 
+                    id="password" 
+                    name="password" 
+                    placeholder="Enter the password"
+                    required
+                    autofocus
+                >
+            </div>
+
+            <button type="submit" class="btn" id="downloadBtn">
+                🔓 Unlock & Download
+            </button>
+        </form>
+
+        <button type="button" class="btn no-password-btn" id="tryWithoutPassword">
+            Try Without Password
+        </button>
+
+        <div class="footer">
+            <p>☁️ Cloud File Share</p>
+            <p>Secure serverless file sharing</p>
+        </div>
+    </div>
+
+    <script>
+        // Get share ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const shareId = urlParams.get('shareId') || window.location.pathname.split('/').pop();
+        const apiEndpoint = 'https://syp1o7qfxj.execute-api.us-east-1.amazonaws.com';
+
+        const form = document.getElementById('downloadForm');
+        const passwordInput = document.getElementById('password');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const tryWithoutPasswordBtn = document.getElementById('tryWithoutPassword');
+        const messageDiv = document.getElementById('message');
+
+        function showMessage(message, type = 'info') {
+            messageDiv.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+        }
+
+        function setLoading(loading) {
+            downloadBtn.disabled = loading;
+            if (loading) {
+                downloadBtn.innerHTML = '<span class="loading"></span> Downloading...';
+            } else {
+                downloadBtn.innerHTML = '🔓 Unlock & Download';
+            }
+        }
+
+        async function downloadFile(password = null) {
+            try {
+                setLoading(true);
+                showMessage('Verifying password and preparing download...', 'info');
+
+                // Build URL with password if provided
+                let url = `${apiEndpoint}/download/${shareId}`;
+                if (password) {
+                    url += `?password=${encodeURIComponent(password)}`;
+                }
+
+                // Make request
+                const response = await fetch(url, {
+                    method: 'GET',
+                    redirect: 'manual' // Don't follow redirects automatically
+                });
+
+                // Check if it's a redirect (302)
+                if (response.type === 'opaqueredirect' || response.status === 302) {
+                    // Get the redirect location
+                    const location = response.headers.get('Location');
+                    if (location) {
+                        showMessage('✓ Password correct! Starting download...', 'success');
+                        // Redirect to download URL
+                        window.location.href = location;
+                        return;
+                    }
+                }
+
+                // If not a redirect, check the response
+                if (response.ok) {
+                    // Try to get JSON response
+                    const data = await response.json();
+                    if (data.downloadUrl) {
+                        showMessage('✓ Password correct! Starting download...', 'success');
+                        window.location.href = data.downloadUrl;
+                        return;
+                    }
+                }
+
+                // Handle errors
+                const errorData = await response.json().catch(() => ({}));
+                const errorMessage = errorData.error || 'Download failed';
+
+                if (response.status === 401) {
+                    showMessage('❌ Incorrect password. Please try again.', 'error');
+                    passwordInput.value = '';
+                    passwordInput.focus();
+                } else if (response.status === 404) {
+                    showMessage('❌ Share link not found or has expired.', 'error');
+                } else if (response.status === 403) {
+                    showMessage('❌ ' + errorMessage, 'error');
+                } else {
+                    showMessage('❌ ' + errorMessage, 'error');
+                }
+
+            } catch (error) {
+                console.error('Download error:', error);
+                showMessage('❌ Network error. Please check your connection and try again.', 'error');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // Form submit handler
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const password = passwordInput.value.trim();
+            
+            if (!password) {
+                showMessage('❌ Please enter a password', 'error');
+                return;
+            }
+
+            await downloadFile(password);
+        });
+
+        // Try without password button
+        tryWithoutPasswordBtn.addEventListener('click', async () => {
+            await downloadFile(null);
+        });
+
+        // Check if shareId exists
+        if (!shareId || shareId === 'download.html') {
+            showMessage('❌ Invalid share link. Please check the URL.', 'error');
+            form.style.display = 'none';
+            tryWithoutPasswordBtn.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
