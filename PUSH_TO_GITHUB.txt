@@ -1,0 +1,107 @@
+===========================================
+QUICK COMMANDS TO PUSH TO GITHUB
+===========================================
+
+STEP 1: Initialize Git
+-----------------------
+git init
+
+
+STEP 2: Add All Files
+----------------------
+git add .
+
+
+STEP 3: Create First Commit
+----------------------------
+git commit -m "Initial commit: Serverless file sharing system on AWS"
+
+
+STEP 4: Create GitHub Repository
+---------------------------------
+1. Go to: https://github.com/new
+2. Repository name: cloud-file-share-aws
+3. Description: Serverless file sharing system built with AWS Lambda, S3, DynamoDB, and React
+4. Choose: Public (recommended for portfolio) or Private
+5. DON'T check "Initialize with README"
+6. Click "Create repository"
+
+
+STEP 5: Connect to GitHub
+--------------------------
+git remote add origin https://github.com/YOUR_USERNAME/cloud-file-share-aws.git
+
+(Replace YOUR_USERNAME with your GitHub username)
+
+
+STEP 6: Push to GitHub
+-----------------------
+git branch -M main
+git push -u origin main
+
+
+DONE! 🎉
+--------
+Your project is now on GitHub!
+
+View it at: https://github.com/YOUR_USERNAME/cloud-file-share-aws
+
+
+===========================================
+SECURITY CHECK (Run Before Pushing)
+===========================================
+
+# Check what will be committed
+git status
+
+# Verify .gitignore is working
+Get-Content .gitignore
+
+# Make sure these are NOT in git status:
+# ❌ .env files
+# ❌ node_modules/
+# ❌ AWS credentials
+
+
+===========================================
+AFTER PUSHING
+===========================================
+
+1. Add repository description on GitHub
+2. Add topics: aws, serverless, lambda, s3, dynamodb, react
+3. Enable Issues (Settings → Features)
+4. Share on LinkedIn/Twitter
+5. Add to your resume/portfolio
+
+
+===========================================
+UPDATE AFTER CHANGES
+===========================================
+
+git add .
+git commit -m "Your update message"
+git push
+
+
+===========================================
+HELPFUL LINKS
+===========================================
+
+Your GitHub: https://github.com/YOUR_USERNAME
+Create Repo: https://github.com/new
+GitHub Docs: https://docs.github.com
+
+Full Guide: See GITHUB_GUIDE.md
+Preparation: See PREPARE_FOR_GITHUB.md
+
+
+===========================================
+QUESTIONS?
+===========================================
+
+Read these files:
+- GITHUB_GUIDE.md (complete guide)
+- PREPARE_FOR_GITHUB.md (checklist)
+- README.md (project documentation)
+
+Your project is safe to push! 🚀

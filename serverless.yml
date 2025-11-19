@@ -1,0 +1,213 @@
+service: cloud-file-share-aws
+
+frameworkVersion: '3'
+
+package:
+  patterns:
+    - '!frontend/**'
+    - '!tests/**'
+    - '!docs/**'
+    - '!scripts/**'
+    - '!.github/**'
+    - '!*.md'
+    - '!.git/**'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  environment:
+    FILES_TABLE: ${self:service}-files-${self:provider.stage}
+    SHARES_TABLE: ${self:service}-shares-${self:provider.stage}
+    BUCKET_NAME: ${self:service}-storage-${self:provider.stage}
+    AUTH_DISABLED: ${env:AUTH_DISABLED, 'true'}
+    MAX_FILE_SIZE: ${env:MAX_FILE_SIZE, '104857600'} # 100MB default
+    OBJECT_TTL_DAYS: ${env:OBJECT_TTL_DAYS, '30'}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:UpdateItem
+            - dynamodb:Query
+          Resource:
+            - !GetAtt FilesTable.Arn
+            - !GetAtt SharesTable.Arn
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:GetObject
+            - s3:DeleteObject
+          Resource: 
+            - !Sub 'arn:aws:s3:::${self:service}-storage-${self:provider.stage}/*'
+        - Effect: Allow
+          Action:
+            - sqs:SendMessage
+            - sqs:GetQueueUrl
+          Resource: !GetAtt ScanQueue.Arn
+
+functions:
+  presigner:
+    handler: src/handlers/presigner.handler
+    events:
+      - httpApi:
+          path: /upload-url
+          method: post
+    environment:
+      FUNCTION_NAME: presigner
+
+  uploadProcessor:
+    handler: src/handlers/uploadProcessor.handler
+    environment:
+      FUNCTION_NAME: uploadProcessor
+      SCAN_QUEUE_URL: !Ref ScanQueue
+
+  createShare:
+    handler: src/handlers/createShare.handler
+    events:
+      - httpApi:
+          path: /shares
+          method: post
+    environment:
+      FUNCTION_NAME: createShare
+
+  downloadHandler:
+    handler: src/handlers/downloadHandler.handler
+    events:
+      - httpApi:
+          path: /download/{shareId}
+          method: get
+    environment:
+      FUNCTION_NAME: downloadHandler
+
+  revokeShare:
+    handler: src/handlers/revokeShare.handler
+    events:
+      - httpApi:
+          path: /shares/{shareId}
+          method: delete
+    environment:
+      FUNCTION_NAME: revokeShare
+
+  scannerStub:
+    handler: src/handlers/scannerStub.handler
+    events:
+      - sqs:
+          arn: !GetAtt ScanQueue.Arn
+          batchSize: 1
+    environment:
+      FUNCTION_NAME: scannerStub
+
+resources:
+  Resources:
+    # S3 Bucket (without notification - will add manually after deployment)
+    StorageBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:service}-storage-${self:provider.stage}
+        BucketEncryption:
+          ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: AES256
+        VersioningConfiguration:
+          Status: Suspended
+        LifecycleConfiguration:
+          Rules:
+            - Id: DeleteOldObjects
+              Status: Enabled
+              ExpirationInDays: ${self:provider.environment.OBJECT_TTL_DAYS}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+
+    # DynamoDB Tables
+    FilesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.FILES_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: fileId
+            AttributeType: S
+          - AttributeName: userId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: fileId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: UserIdIndex
+            KeySchema:
+              - AttributeName: userId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+
+    SharesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.SHARES_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: shareId
+            AttributeType: S
+          - AttributeName: fileId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: shareId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: FileIdIndex
+            KeySchema:
+              - AttributeName: fileId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        TimeToLiveSpecification:
+          AttributeName: expiresAt
+          Enabled: true
+
+    # SQS Queue for scan jobs
+    ScanQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-scan-queue-${self:provider.stage}
+        VisibilityTimeout: 300
+
+    # Cognito User Pool
+    CognitoUserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: ${self:service}-users-${self:provider.stage}
+        AutoVerifiedAttributes:
+          - email
+        UsernameAttributes:
+          - email
+        Schema:
+          - Name: email
+            Required: true
+            Mutable: false
+
+    CognitoUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: ${self:service}-client-${self:provider.stage}
+        UserPoolId: !Ref CognitoUserPool
+        ExplicitAuthFlows:
+          - ALLOW_USER_PASSWORD_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
+        GenerateSecret: false
+
+  Outputs:
+    ApiEndpoint:
+      Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
+    UserPoolId:
+      Value: !Ref CognitoUserPool
+    UserPoolClientId:
+      Value: !Ref CognitoUserPoolClient
+    BucketName:
+      Value: !Ref StorageBucket

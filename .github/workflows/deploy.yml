@@ -1,0 +1,93 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run linter
+        run: npm run lint
+        continue-on-error: true
+      
+      - name: Run unit tests
+        run: npm test
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
+          flags: unittests
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install Serverless Framework
+        run: npm install -g serverless@3
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
+      - name: Deploy to dev
+        if: github.ref == 'refs/heads/dev'
+        run: serverless deploy --stage dev
+        env:
+          AUTH_DISABLED: 'false'
+          MAX_FILE_SIZE: '104857600'
+          OBJECT_TTL_DAYS: '30'
+      
+      - name: Deploy to prod
+        if: github.ref == 'refs/heads/main'
+        run: serverless deploy --stage prod
+        env:
+          AUTH_DISABLED: 'false'
+          MAX_FILE_SIZE: '104857600'
+          OBJECT_TTL_DAYS: '90'
+      
+      - name: Run integration tests
+        if: github.ref == 'refs/heads/dev'
+        run: npm run test:integration
+        env:
+          API_ENDPOINT: ${{ secrets.DEV_API_ENDPOINT }}
+          AUTH_TOKEN: ${{ secrets.DEV_AUTH_TOKEN }}
+          FILES_TABLE: cloud-file-share-aws-files-dev
+          SHARES_TABLE: cloud-file-share-aws-shares-dev
