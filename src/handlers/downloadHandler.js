@@ -132,12 +132,15 @@ exports.handler = async (event) => {
       downloadCount: share.downloadCount + 1
     });
     
-    return success({
-      downloadUrl,
-      filename: share.filename,
-      contentType: share.contentType,
-      expiresIn: DOWNLOAD_URL_EXPIRY
-    });
+    // Return 302 redirect for browser downloads
+    return {
+      statusCode: 302,
+      headers: {
+        'Location': downloadUrl,
+        'Cache-Control': 'no-cache, no-store, must-revalidate'
+      },
+      body: ''
+    };
     
   } catch (err) {
     logger.error('Error processing download', { error: err.message, stack: err.stack });
