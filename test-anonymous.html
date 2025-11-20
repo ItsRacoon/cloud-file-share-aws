@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Anonymous Upload</title>
+</head>
+<body>
+    <h1>Test Anonymous File Upload</h1>
+    
+    <div>
+        <input type="file" id="fileInput">
+        <button onclick="testUpload()">Test Upload</button>
+    </div>
+    
+    <div id="result"></div>
+    
+    <script>
+        const API_ENDPOINT = 'https://syp1o7qfxj.execute-api.us-east-1.amazonaws.com';
+        
+        async function testUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file');
+                return;
+            }
+            
+            try {
+                // Step 1: Get upload URL
+                console.log('Getting upload URL...');
+                const uploadResponse = await fetch(`${API_ENDPOINT}/upload-url`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        filename: file.name,
+                        contentType: file.type,
+                        size: file.size
+                    })
+                });
+                
+                if (!uploadResponse.ok) {
+                    throw new Error(`Upload URL failed: ${uploadResponse.status}`);
+                }
+                
+                const uploadData = await uploadResponse.json();
+                console.log('Upload URL received:', uploadData);
+                
+                // Step 2: Upload to S3
+                console.log('Uploading to S3...');
+                const s3Response = await fetch(uploadData.uploadUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': file.type
+                    },
+                    body: file
+                });
+                
+                if (!s3Response.ok) {
+                    throw new Error(`S3 upload failed: ${s3Response.status}`);
+                }
+                
+                console.log('File uploaded to S3');
+                
+                // Step 3: Wait a bit for processing
+                console.log('Waiting for processing...');
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                
+                // Step 4: Create share
+                console.log('Creating share...');
+                const shareResponse = await fetch(`${API_ENDPOINT}/shares`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        fileId: uploadData.fileId,
+                        expiresInSeconds: 3600
+                    })
+                });
+                
+                if (!shareResponse.ok) {
+                    const errorText = await shareResponse.text();
+                    throw new Error(`Share creation failed: ${shareResponse.status} - ${errorText}`);
+                }
+                
+                const shareData = await shareResponse.json();
+                console.log('Share created:', shareData);
+                
+                document.getElementById('result').innerHTML = `
+                    <h2>Success!</h2>
+                    <p>File ID: ${uploadData.fileId}</p>
+                    <p>Share URL: <a href="${API_ENDPOINT}${shareData.shareUrl}" target="_blank">${API_ENDPOINT}${shareData.shareUrl}</a></p>
+                `;
+                
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('result').innerHTML = `<h2>Error: ${error.message}</h2>`;
+            }
+        }
+    </script>
+</body>
+</html>

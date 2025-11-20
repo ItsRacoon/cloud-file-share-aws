@@ -37,8 +37,12 @@ exports.handler = async (event) => {
   try {
     logger.info('Creating share link');
     
-    // Extract user ID from JWT claims
-    const userId = event.requestContext?.authorizer?.jwt?.claims?.sub || 'demo-user';
+    // Extract user info from JWT or mark as anonymous
+    const authHeader = event.headers?.authorization || event.headers?.Authorization;
+    const isAuthenticated = authHeader && authHeader.startsWith('Bearer ') && authHeader !== 'Bearer demo-token';
+    const userId = isAuthenticated 
+      ? event.requestContext?.authorizer?.jwt?.claims?.sub || event.requestContext?.authorizer?.jwt?.claims?.email
+      : `anonymous-${event.requestContext?.identity?.sourceIp?.replace(/\./g, '-') || 'unknown'}`;
     
     // Parse request body
     const body = JSON.parse(event.body || '{}');
@@ -66,8 +70,14 @@ exports.handler = async (event) => {
       return error('File not found', 404);
     }
     
-    if (fileResult.Item.userId !== userId) {
-      logger.warn('Unauthorized access attempt', { fileId, userId });
+    // Check file ownership (more flexible for anonymous users)
+    const fileUserId = fileResult.Item.userId;
+    const isOwner = fileUserId === userId || 
+                   (fileUserId === 'demo-user' && !isAuthenticated) ||
+                   (fileUserId.startsWith('anonymous-') && !isAuthenticated);
+    
+    if (!isOwner) {
+      logger.warn('Unauthorized access attempt', { fileId, userId, fileUserId });
       return error('Unauthorized', 403);
     }
     

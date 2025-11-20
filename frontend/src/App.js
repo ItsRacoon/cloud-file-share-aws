@@ -32,47 +32,7 @@ function App() {
   const [userLinks, setUserLinks] = useState([]);
   const [showDashboard, setShowDashboard] = useState(false);
 
-  // Load Google Sign-In
-  useEffect(() => {
-    const loadGoogleSignIn = () => {
-      if (window.google) {
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: handleGoogleSignIn
-        });
-      }
-    };
-
-    if (GOOGLE_CLIENT_ID) {
-      if (window.google) {
-        loadGoogleSignIn();
-      } else {
-        const script = document.createElement('script');
-        script.src = 'https://accounts.google.com/gsi/client';
-        script.onload = loadGoogleSignIn;
-        document.head.appendChild(script);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Processing countdown timer
-  useEffect(() => {
-    if (countdown > 0) {
-      const timer = setTimeout(() => {
-        setCountdown(countdown - 1);
-        setProcessingProgress(((20 - countdown) / 20) * 100);
-      }, 1000);
-      return () => clearTimeout(timer);
-    } else if (countdown === 0 && processing) {
-      setProcessing(false);
-      setProcessingProgress(100);
-      handleAutoCreateShare();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [countdown, processing]);
-
-  // Google Sign-In handler
+  // Google Sign-In handler (defined before useEffect)
   const handleGoogleSignIn = (response) => {
     try {
       const payload = JSON.parse(atob(response.credential.split('.')[1]));
@@ -91,6 +51,63 @@ function App() {
       setMessage('❌ Sign-in failed. Please try again.');
     }
   };
+
+  // Load Google Sign-In
+  useEffect(() => {
+    const loadGoogleSignIn = () => {
+      if (window.google && GOOGLE_CLIENT_ID) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleGoogleSignIn,
+          auto_select: false,
+          cancel_on_tap_outside: false
+        });
+        
+        // Render the button
+        if (document.getElementById('google-signin-button')) {
+          window.google.accounts.id.renderButton(
+            document.getElementById('google-signin-button'),
+            { 
+              theme: 'filled_black', 
+              size: 'large',
+              type: 'standard',
+              text: 'signin_with'
+            }
+          );
+        }
+      }
+    };
+
+    if (GOOGLE_CLIENT_ID) {
+      if (window.google) {
+        loadGoogleSignIn();
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.onload = loadGoogleSignIn;
+        document.head.appendChild(script);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [GOOGLE_CLIENT_ID]);
+
+  // Processing countdown timer
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(countdown - 1);
+        setProcessingProgress(((20 - countdown) / 20) * 100);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (countdown === 0 && processing) {
+      setProcessing(false);
+      setProcessingProgress(100);
+      handleAutoCreateShare();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countdown, processing]);
+
+
 
   // Sign out handler
   const handleSignOut = () => {
@@ -348,13 +365,7 @@ function App() {
                 {authMode === 'google' && (
                   <div className="google-signin">
                     {GOOGLE_CLIENT_ID ? (
-                      <>
-                        <div id="g_id_onload"
-                             data-client_id={GOOGLE_CLIENT_ID}
-                             data-callback="handleGoogleSignIn">
-                        </div>
-                        <div className="g_id_signin" data-type="standard"></div>
-                      </>
+                      <div id="google-signin-button"></div>
                     ) : (
                       <div className="google-setup-message">
                         <p>🔧 Google Sign-In not configured</p>
