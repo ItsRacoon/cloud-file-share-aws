@@ -36,7 +36,11 @@ provider:
     SHARES_TABLE: ${self:service}-shares-${self:provider.stage}
     BUCKET_NAME: ${self:service}-storage-${self:provider.stage}
     AUTH_DISABLED: ${env:AUTH_DISABLED, 'true'}
-    MAX_FILE_SIZE: ${env:MAX_FILE_SIZE, '104857600'} # 100MB default
+    MAX_FILE_SIZE: ${env:MAX_FILE_SIZE, '52428800'} # 50MB for authenticated users
+    MAX_FILE_SIZE_ANONYMOUS: ${env:MAX_FILE_SIZE_ANONYMOUS, '10485760'} # 10MB for anonymous
+    DAILY_UPLOAD_LIMIT: ${env:DAILY_UPLOAD_LIMIT, '10'} # 10 files per day for authenticated
+    DAILY_UPLOAD_LIMIT_ANONYMOUS: ${env:DAILY_UPLOAD_LIMIT_ANONYMOUS, '3'} # 3 files per day for anonymous
+    MONTHLY_STORAGE_LIMIT: ${env:MONTHLY_STORAGE_LIMIT, '1073741824'} # 1GB per month
     OBJECT_TTL_DAYS: ${env:OBJECT_TTL_DAYS, '30'}
   iam:
     role:
@@ -114,6 +118,15 @@ functions:
           batchSize: 1
     environment:
       FUNCTION_NAME: scannerStub
+
+  userLinks:
+    handler: src/handlers/userLinks.handler
+    events:
+      - httpApi:
+          path: /user/{userId}/shares
+          method: get
+    environment:
+      FUNCTION_NAME: userLinks
 
 resources:
   Resources:

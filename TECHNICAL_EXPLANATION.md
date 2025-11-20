@@ -14,9 +14,9 @@ This project demonstrates a **production-ready, serverless file sharing platform
 │                        CLIENT LAYER                             │
 ├─────────────────────────────────────────────────────────────────┤
 │  React Frontend (SPA)                                           │
-│  - Modern UI/UX with real-time feedback                        │
-│  - Responsive design (mobile/desktop)                          │
-│  - Direct S3 upload via pre-signed URLs                        │
+│  - Modern UI/UX with real-time feedback                         │
+│  - Responsive design (mobile/desktop)                           │
+│  - Direct S3 upload via pre-signed URLs                         │
 └─────────────────┬───────────────────────────────────────────────┘
                   │ HTTPS/TLS
                   ▼

@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react';
 import './index.css';
 
+// Google Sign-In configuration
+const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || ''; // Add your Google Client ID
+
 const API_ENDPOINT = process.env.REACT_APP_API_ENDPOINT || 'https://syp1o7qfxj.execute-api.us-east-1.amazonaws.com';
 
 function App() {
-  const [token] = useState('demo-token');
+  // Authentication state
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [authMode, setAuthMode] = useState('anonymous'); // 'anonymous' or 'google'
+  
+  // File upload state
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -19,6 +27,34 @@ function App() {
     password: '',
     maxDownloads: ''
   });
+  
+  // User dashboard state
+  const [userLinks, setUserLinks] = useState([]);
+  const [showDashboard, setShowDashboard] = useState(false);
+
+  // Load Google Sign-In
+  useEffect(() => {
+    const loadGoogleSignIn = () => {
+      if (window.google) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleGoogleSignIn
+        });
+      }
+    };
+
+    if (GOOGLE_CLIENT_ID) {
+      if (window.google) {
+        loadGoogleSignIn();
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.onload = loadGoogleSignIn;
+        document.head.appendChild(script);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Processing countdown timer
   useEffect(() => {
@@ -36,6 +72,79 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [countdown, processing]);
 
+  // Google Sign-In handler
+  const handleGoogleSignIn = (response) => {
+    try {
+      const payload = JSON.parse(atob(response.credential.split('.')[1]));
+      setUser({
+        id: payload.sub,
+        email: payload.email,
+        name: payload.name,
+        picture: payload.picture
+      });
+      setToken(response.credential);
+      setAuthMode('google');
+      setMessage('✓ Signed in successfully!');
+      loadUserLinks(payload.sub);
+    } catch (error) {
+      console.error('Google Sign-In error:', error);
+      setMessage('❌ Sign-in failed. Please try again.');
+    }
+  };
+
+  // Sign out handler
+  const handleSignOut = () => {
+    setUser(null);
+    setToken(null);
+    setAuthMode('anonymous');
+    setUserLinks([]);
+    setShowDashboard(false);
+    setMessage('Signed out successfully');
+  };
+
+  // Load user's links
+  const loadUserLinks = async (userId) => {
+    try {
+      const response = await fetch(`${API_ENDPOINT}/user/${userId}/shares`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setUserLinks(data.shares || []);
+      }
+    } catch (error) {
+      console.error('Failed to load user links:', error);
+    }
+  };
+
+  // Revoke link handler
+  const handleRevokeLink = async (shareId) => {
+    try {
+      const response = await fetch(`${API_ENDPOINT}/shares/${shareId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        setMessage('✓ Link revoked successfully');
+        // Refresh user links
+        if (user) {
+          loadUserLinks(user.id);
+        }
+      } else {
+        throw new Error('Failed to revoke link');
+      }
+    } catch (error) {
+      console.error('Revoke error:', error);
+      setMessage('❌ Failed to revoke link');
+    }
+  };
+
   const handleFileSelect = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
@@ -52,18 +161,30 @@ function App() {
       return;
     }
 
+    // Check file size limits based on authentication
+    const maxSize = user ? 50 * 1024 * 1024 : 10 * 1024 * 1024; // 50MB for authenticated, 10MB for anonymous
+    if (file.size > maxSize) {
+      setMessage(`❌ File too large. Maximum size: ${user ? '50MB' : '10MB'}. ${!user ? 'Sign in for higher limits.' : ''}`);
+      return;
+    }
+
     try {
       setUploading(true);
       setUploadProgress(0);
       setMessage('Requesting upload URL...');
 
       // Get pre-signed URL
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${API_ENDPOINT}/upload-url`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers,
         body: JSON.stringify({
           filename: file.name,
           contentType: file.type,
@@ -123,12 +244,17 @@ function App() {
     try {
       setMessage('Creating share link...');
 
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${API_ENDPOINT}/shares`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers,
         body: JSON.stringify({
           fileId,
           expiresInSeconds: parseInt(shareConfig.expiresInSeconds),
@@ -181,11 +307,137 @@ function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>☁️ Cloud File Share</h1>
-        <p>Secure serverless file sharing</p>
+        <div className="header-content">
+          <div className="header-title">
+            <h1>☁️ Cloud File Share</h1>
+            <p>Secure serverless file sharing</p>
+          </div>
+          
+          <div className="auth-section">
+            {user ? (
+              <div className="user-info">
+                <img src={user.picture} alt={user.name} className="user-avatar" />
+                <div className="user-details">
+                  <span className="user-name">{user.name}</span>
+                  <span className="user-email">{user.email}</span>
+                </div>
+                <button className="btn btn-outline btn-small" onClick={() => setShowDashboard(!showDashboard)}>
+                  {showDashboard ? 'Hide' : 'My Links'}
+                </button>
+                <button className="btn btn-outline btn-small" onClick={handleSignOut}>
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <div className="auth-options">
+                <div className="auth-toggle">
+                  <button 
+                    className={`btn ${authMode === 'anonymous' ? 'btn-primary' : 'btn-outline'} btn-small`}
+                    onClick={() => setAuthMode('anonymous')}
+                  >
+                    Share Anonymously
+                  </button>
+                  <button 
+                    className={`btn ${authMode === 'google' ? 'btn-primary' : 'btn-outline'} btn-small`}
+                    onClick={() => setAuthMode('google')}
+                  >
+                    Sign In with Google
+                  </button>
+                </div>
+                
+                {authMode === 'google' && GOOGLE_CLIENT_ID && (
+                  <div className="google-signin">
+                    <div id="g_id_onload"
+                         data-client_id={GOOGLE_CLIENT_ID}
+                         data-callback="handleGoogleSignIn">
+                    </div>
+                    <div className="g_id_signin" data-type="standard"></div>
+                  </div>
+                )}
+                
+                <div className="limits-info">
+                  <p className="limits-text">
+                    {authMode === 'anonymous' ? (
+                      <>📊 Anonymous: 10MB files, 3 uploads/day</>
+                    ) : (
+                      <>🔐 Signed in: 50MB files, 10 uploads/day, saved links</>
+                    )}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </header>
 
       <main className="container">
+        {/* User Dashboard */}
+        {user && showDashboard && (
+          <div className="card dashboard-card">
+            <div className="dashboard-header">
+              <h2>📊 My Dashboard</h2>
+              <button className="btn btn-outline btn-small" onClick={() => setShowDashboard(false)}>
+                ✕ Close
+              </button>
+            </div>
+            
+            <div className="dashboard-stats">
+              <div className="stat-item">
+                <span className="stat-label">Total Links:</span>
+                <span className="stat-value">{userLinks.length}</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-label">Active Links:</span>
+                <span className="stat-value">{userLinks.filter(link => !link.expired && !link.revoked).length}</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-label">Expired Links:</span>
+                <span className="stat-value">{userLinks.filter(link => link.expired).length}</span>
+              </div>
+            </div>
+            
+            <div className="links-list">
+              <h3>Your Share Links</h3>
+              {userLinks.length === 0 ? (
+                <p className="no-links">No share links yet. Upload a file to create your first link!</p>
+              ) : (
+                <div className="links-grid">
+                  {userLinks.map((link, index) => (
+                    <div key={index} className={`link-item ${link.expired ? 'expired' : link.revoked ? 'revoked' : 'active'}`}>
+                      <div className="link-info">
+                        <div className="link-filename">📄 {link.filename}</div>
+                        <div className="link-created">Created: {new Date(link.createdAt).toLocaleDateString()}</div>
+                        <div className="link-status">
+                          Status: {link.revoked ? '🚫 Revoked' : link.expired ? '⏰ Expired' : '✅ Active'}
+                        </div>
+                        <div className="link-downloads">Downloads: {link.downloadCount || 0}</div>
+                      </div>
+                      <div className="link-actions">
+                        {!link.expired && !link.revoked && (
+                          <>
+                            <button 
+                              className="btn btn-secondary btn-small"
+                              onClick={() => navigator.clipboard.writeText(link.shareUrl)}
+                            >
+                              📋 Copy
+                            </button>
+                            <button 
+                              className="btn btn-danger btn-small"
+                              onClick={() => handleRevokeLink(link.shareId)}
+                            >
+                              🗑️ Revoke
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="card main-card">
           
           {/* Step 1: File Selection */}
