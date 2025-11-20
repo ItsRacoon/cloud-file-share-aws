@@ -4,6 +4,10 @@ import './index.css';
 // Google Sign-In configuration
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || ''; // Add your Google Client ID
 
+// Debug logging
+console.log('Google Client ID:', GOOGLE_CLIENT_ID ? 'Set' : 'Not set');
+console.log('Environment:', process.env.NODE_ENV);
+
 const API_ENDPOINT = process.env.REACT_APP_API_ENDPOINT || 'https://syp1o7qfxj.execute-api.us-east-1.amazonaws.com';
 
 function App() {
@@ -56,40 +60,63 @@ function App() {
   useEffect(() => {
     const loadGoogleSignIn = () => {
       if (window.google && GOOGLE_CLIENT_ID) {
+        console.log('Initializing Google Sign-In with Client ID:', GOOGLE_CLIENT_ID);
         window.google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
           callback: handleGoogleSignIn,
           auto_select: false,
           cancel_on_tap_outside: false
         });
-        
-        // Render the button
-        if (document.getElementById('google-signin-button')) {
-          window.google.accounts.id.renderButton(
-            document.getElementById('google-signin-button'),
-            { 
-              theme: 'filled_black', 
-              size: 'large',
-              type: 'standard',
-              text: 'signin_with'
-            }
-          );
-        }
       }
     };
 
     if (GOOGLE_CLIENT_ID) {
+      console.log('Loading Google Sign-In script...');
       if (window.google) {
         loadGoogleSignIn();
       } else {
         const script = document.createElement('script');
         script.src = 'https://accounts.google.com/gsi/client';
-        script.onload = loadGoogleSignIn;
+        script.onload = () => {
+          console.log('Google Sign-In script loaded');
+          loadGoogleSignIn();
+        };
+        script.onerror = () => {
+          console.error('Failed to load Google Sign-In script');
+        };
         document.head.appendChild(script);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [GOOGLE_CLIENT_ID]);
+
+  // Render Google Sign-In button when authMode changes
+  useEffect(() => {
+    if (authMode === 'google' && window.google && GOOGLE_CLIENT_ID) {
+      const renderButton = () => {
+        const buttonElement = document.getElementById('google-signin-button');
+        if (buttonElement) {
+          console.log('Rendering Google Sign-In button');
+          // Clear any existing content
+          buttonElement.innerHTML = '';
+          
+          window.google.accounts.id.renderButton(buttonElement, {
+            theme: 'filled_black',
+            size: 'large',
+            type: 'standard',
+            text: 'signin_with',
+            width: 250
+          });
+        } else {
+          console.log('Button element not found, retrying...');
+          setTimeout(renderButton, 100);
+        }
+      };
+      
+      setTimeout(renderButton, 100);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authMode]);
 
   // Processing countdown timer
   useEffect(() => {
@@ -365,7 +392,24 @@ function App() {
                 {authMode === 'google' && (
                   <div className="google-signin">
                     {GOOGLE_CLIENT_ID ? (
-                      <div id="google-signin-button"></div>
+                      <div className="google-signin-container">
+                        <div id="google-signin-button"></div>
+                        <button 
+                          className="btn btn-primary btn-small manual-signin"
+                          onClick={() => {
+                            if (window.google) {
+                              window.google.accounts.id.prompt();
+                            } else {
+                              setMessage('❌ Google Sign-In not loaded. Please refresh the page.');
+                            }
+                          }}
+                        >
+                          🔐 Sign In with Google (Manual)
+                        </button>
+                        <p className="signin-help">
+                          If the Google button doesn't appear, try the manual button above or refresh the page.
+                        </p>
+                      </div>
                     ) : (
                       <div className="google-setup-message">
                         <p>🔧 Google Sign-In not configured</p>

@@ -256,6 +256,33 @@ body {
   font-weight: 600;
 }
 
+/* Google Sign-In Container */
+.google-signin-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  max-width: 300px;
+}
+
+.manual-signin {
+  margin-top: 0.5rem;
+}
+
+.signin-help {
+  color: #999;
+  font-size: 0.7rem;
+  text-align: center;
+  font-style: italic;
+  margin: 0;
+}
+
+#google-signin-button {
+  display: flex;
+  justify-content: center;
+  min-height: 40px;
+}
+
 /* Container */
 .container {
   flex: 1;
