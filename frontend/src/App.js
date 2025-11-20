@@ -345,13 +345,29 @@ function App() {
                   </button>
                 </div>
                 
-                {authMode === 'google' && GOOGLE_CLIENT_ID && (
+                {authMode === 'google' && (
                   <div className="google-signin">
-                    <div id="g_id_onload"
-                         data-client_id={GOOGLE_CLIENT_ID}
-                         data-callback="handleGoogleSignIn">
-                    </div>
-                    <div className="g_id_signin" data-type="standard"></div>
+                    {GOOGLE_CLIENT_ID ? (
+                      <>
+                        <div id="g_id_onload"
+                             data-client_id={GOOGLE_CLIENT_ID}
+                             data-callback="handleGoogleSignIn">
+                        </div>
+                        <div className="g_id_signin" data-type="standard"></div>
+                      </>
+                    ) : (
+                      <div className="google-setup-message">
+                        <p>🔧 Google Sign-In not configured</p>
+                        <p>Add REACT_APP_GOOGLE_CLIENT_ID to your .env file</p>
+                        <p>See GOOGLE_SIGNIN_SETUP.md for instructions</p>
+                        <button 
+                          className="btn btn-outline btn-small"
+                          onClick={() => setAuthMode('anonymous')}
+                        >
+                          Use Anonymous Mode
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
                 
